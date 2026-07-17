@@ -1,0 +1,14 @@
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Supabase
+.temp
+.branches
