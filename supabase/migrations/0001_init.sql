@@ -1,5 +1,5 @@
--- =====================================================================
--- FinZen — Migración inicial (Fase 1)
+﻿-- =====================================================================
+-- Ahorbit — Migración inicial (Fase 1)
 -- Tablas + RLS + trigger de perfil + seed de categorías + vistas de saldo
 -- Pegar completo en Supabase -> SQL Editor -> Run.
 -- Es re-ejecutable (usa IF NOT EXISTS / DROP ... IF EXISTS).

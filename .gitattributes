@@ -1,0 +1,23 @@
+# Normaliza los fines de línea: todo texto se guarda con LF en el repo.
+# Git detecta binarios automáticamente y no los toca.
+* text=auto eol=lf
+
+# Scripts de Windows: deben conservar CRLF para funcionar.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# El wrapper de Gradle (shell) debe quedar en LF.
+gradlew text eol=lf
+
+# Binarios explícitos (redundante con text=auto, pero evita sorpresas).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg text
+*.pdf binary
+*.jar binary
+*.keystore binary
+*.apk binary

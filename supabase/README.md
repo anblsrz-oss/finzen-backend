@@ -1,4 +1,4 @@
-# Configuración de Supabase — FinZen (Fase 1)
+﻿# Configuración de Supabase — Ahorbit (Fase 1)
 
 Proyecto Supabase: `vujlizgyharlhcmfgkti`
 URL: `https://vujlizgyharlhcmfgkti.supabase.co`
@@ -22,7 +22,7 @@ URL: `https://vujlizgyharlhcmfgkti.supabase.co`
 - Tipo de aplicación: **Web application**
 - **Authorized JavaScript origins:**
   - `http://localhost:5173`
-  - (más adelante) la URL de producción, p. ej. `https://finzen.vercel.app`
+  - (más adelante) la URL de producción, p. ej. `https://Ahorbit.vercel.app`
 - **Authorized redirect URIs:**
   - `https://vujlizgyharlhcmfgkti.supabase.co/auth/v1/callback`
 - Al crear, Google te da **Client ID** y **Client Secret**.
