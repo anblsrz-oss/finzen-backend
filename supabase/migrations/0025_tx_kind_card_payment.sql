@@ -1,0 +1,13 @@
+-- =====================================================================
+-- Ahorbit — Nuevo tipo de movimiento: pago de tarjeta.
+-- Un consumo a crédito es DEUDA, no egreso de efectivo. El egreso real
+-- ocurre al PAGAR la tarjeta: sale dinero de una cuenta y baja la deuda
+-- de la línea. Se modela como un kind propio para que reportes y saldos
+-- lo distingan de un gasto normal o una transferencia.
+--
+-- IMPORTANTE: un valor nuevo de enum no puede USARSE en la misma
+-- transacción en que se agrega, así que esta migración SOLO lo agrega.
+-- Las columnas y vistas que lo referencian van en 0026.
+-- Re-ejecutable (add value if not exists).
+-- =====================================================================
+alter type public.tx_kind add value if not exists 'card_payment';
