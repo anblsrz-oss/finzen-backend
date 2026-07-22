@@ -1,11 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Sincroniza movimientos desde los correos de alerta bancaria del propio usuario.
-// El cliente envía su `providerToken` de Google (obtenido al dar consentimiento
-// al scope gmail.readonly). Aquí se consulta Gmail API, se parsea con las reglas
-// del usuario (parsing_rules channel='email') y se insertan transacciones
-// PENDIENTES (source='email', pending=true) para que el usuario confirme.
+// Sincroniza movimientos desde los correos del propio usuario: alertas del
+// banco y correos de proveedores (facturas, tickets, domiciliados). El cliente
+// envía su `providerToken` de Google (scope gmail.readonly). Aquí se consulta
+// Gmail API, se parsea con las reglas del usuario (parsing_rules channel='email')
+// y se insertan transacciones PENDIENTES (source='email', pending=true) para
+// que el usuario confirme.
 //
 // Requisitos de OAuth (ver src/lib/emailSync.ts y NATIVE_SETUP.md):
 //   scope: https://www.googleapis.com/auth/gmail.readonly
@@ -24,7 +25,26 @@ interface EmailRuleConfig {
   amountRegex?: string
   dateRegex?: string
   conceptRegex?: string
+  // Moneda fija o regex que la extrae (grupo 1). Si no hay ninguna: MXN.
+  currency?: string
+  currencyRegex?: string
+  // Tipo de movimiento a crear. Por defecto 'expense'.
+  kind?: 'income' | 'expense'
+  // Regex que extrae la terminación (4 dígitos) de la tarjeta del correo.
+  last4Regex?: string
 }
+
+interface CardRow {
+  id: string
+  last4: string | null
+  type: string
+  account_id: string | null
+}
+
+// Terminación de tarjeta genérica cuando la regla no define last4Regex. Exige
+// palabras de contexto o máscara para no confundirse con otros números.
+const GENERIC_LAST4 =
+  /(?:terminaci[oó]n|terminada en|final(?:iza)?(?:\s+en)?|\*{2,}|·{2,}|x{2,})\s*(\d{4})/i
 
 function djb2(str: string): string {
   let h = 5381
@@ -126,10 +146,21 @@ serve(async (req) => {
       return json(
         {
           error:
-            'No hay reglas de correo configuradas. Crea una regla por banco (remitente + patrones) primero.',
+            'No hay reglas de correo configuradas. Crea una regla por remitente (banco o proveedor) primero.',
         },
         400,
       )
+    }
+
+    // Tarjetas del usuario, para resolver la terminación (last4) del correo.
+    const { data: cardsData } = await supabase
+      .from('cards')
+      .select('id, last4, type, account_id')
+      .eq('user_id', userId)
+    const cards: CardRow[] = (cardsData ?? []) as CardRow[]
+    const resolveCard = (last4: string | null): CardRow | null => {
+      if (!last4) return null
+      return cards.find((c) => c.last4 && c.last4 === last4) ?? null
     }
 
     const senders = rules
@@ -184,6 +215,7 @@ serve(async (req) => {
             currency: cfdi.currency ?? 'MXN',
             concept: (cfdi.emisor ?? subject).slice(0, 200),
             account_id: defaultAccountId,
+            card_id: null,
             tx_date:
               cfdi.date ??
               new Date(parseInt(msg.internalDate, 10)).toISOString().slice(0, 10),
@@ -216,17 +248,41 @@ serve(async (req) => {
         ? text.match(new RegExp(cfg.conceptRegex, 'i'))?.[1] ?? subject
         : subject
 
-      const external_id = djb2(id)
+      // Moneda: fija de la regla, regex de la regla, o MXN por compatibilidad.
+      let currency = 'MXN'
+      if (cfg.currency && /^[A-Za-z]{3}$/.test(cfg.currency)) {
+        currency = cfg.currency.toUpperCase()
+      } else if (cfg.currencyRegex) {
+        const m = text.match(new RegExp(cfg.currencyRegex, 'i'))?.[1]
+        if (m && /^[A-Za-z]{3}$/.test(m)) currency = m.toUpperCase()
+      }
+
+      const kind: 'income' | 'expense' = cfg.kind === 'income' ? 'income' : 'expense'
+
+      // Terminación de tarjeta: regex de la regla o patrón genérico. Si coincide
+      // una tarjeta del usuario, se asigna esa tarjeta (y su cuenta si aplica).
+      const last4 = cfg.last4Regex
+        ? text.match(new RegExp(cfg.last4Regex, 'i'))?.[1] ?? null
+        : text.match(GENERIC_LAST4)?.[1] ?? null
+      const card = resolveCard(last4)
+      // Crédito no toca cuenta; débito/vale descuentan de su cuenta ligada.
+      const accountId = card
+        ? card.type === 'credit'
+          ? null
+          : card.account_id
+        : defaultAccountId
+
       staged.push({
         user_id: userId,
-        kind: 'expense', // las alertas suelen ser cargos; el usuario ajusta al confirmar
+        kind,
         amount,
-        currency: 'MXN',
+        currency,
         concept: concept.slice(0, 200),
-        account_id: defaultAccountId,
+        account_id: accountId,
+        card_id: card?.id ?? null,
         tx_date: new Date(parseInt(msg.internalDate, 10)).toISOString().slice(0, 10),
         source: 'email',
-        external_id,
+        external_id: djb2(id),
         pending: true,
       })
     }
