@@ -17,7 +17,9 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  // supabase-js adjunta apikey y x-client-info en cada invoke; sin declararlas
+  // el navegador bloquea el POST tras el preflight ("Failed to send a request").
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface EmailRuleConfig {
