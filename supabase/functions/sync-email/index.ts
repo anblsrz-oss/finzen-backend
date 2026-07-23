@@ -178,7 +178,12 @@ serve(async (req) => {
       { headers: { Authorization: `Bearer ${providerToken}` } },
     )
     if (!listRes.ok) {
-      return json({ error: `Gmail list falló: ${listRes.status}` }, 502)
+      const detail = await listRes.text().catch(() => '')
+      console.error('Gmail list error', listRes.status, detail)
+      return json(
+        { error: `Gmail list falló: ${listRes.status} ${detail.slice(0, 400)}` },
+        502,
+      )
     }
     const list = await listRes.json()
     const ids: string[] = (list.messages ?? []).map((m: any) => m.id)
