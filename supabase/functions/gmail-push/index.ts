@@ -83,6 +83,14 @@ serve(async (req) => {
       .eq('channel', 'email')
     const ruleList = (rules ?? []) as EmailRule[]
 
+    // Sin remitentes configurados no hay nada que capturar. history.list no
+    // acepta filtro `from:`, así que aquí llega TODO el buzón (incluidas
+    // Promociones y Social): sin reglas, avanzar y salir sin tocar nada.
+    if (ruleList.length === 0) {
+      await updateHistory(admin, userId, newHistory)
+      return ok()
+    }
+
     const { data: cardsData } = await admin
       .from('cards')
       .select('id, last4, type, account_id')

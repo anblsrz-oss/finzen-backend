@@ -119,6 +119,7 @@ serve(async (req) => {
     const { data: existing } = await supabase
       .from('transactions')
       .select('external_id')
+      .eq('user_id', userId)
       .in('external_id', extIds)
     const seen = new Set((existing ?? []).map((r: any) => r.external_id))
     const fresh = staged.filter((s) => !seen.has(s.external_id as string))

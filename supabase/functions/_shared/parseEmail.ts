@@ -45,13 +45,55 @@ export function decodeB64Url(data: string): string {
   }
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+}
+
+// Deja solo el texto legible del HTML. Sin esto el CSS y el JS del correo
+// (line-height:1.25, margin:0.05em) entran al buscador de montos y producen
+// transacciones fantasma.
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<br\s*\/?>|<\/(?:p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&(?:nbsp|amp|lt|gt|quot|apos);/gi, (m) => NAMED_ENTITIES[m.toLowerCase()] ?? m)
+    .replace(/[ \t ]+/g, ' ')
+    .replace(/\n[ \n]*\n+/g, '\n')
+    .trim()
+}
+
+// Primera parte MIME del tipo pedido, ignorando adjuntos.
+function findPart(payload: any, mimeType: string): string | null {
+  if (!payload || payload.filename) return null
+  const mt = (payload.mimeType ?? '').toLowerCase()
+  if (mt.startsWith(mimeType) && payload.body?.data) {
+    return decodeB64Url(payload.body.data)
+  }
+  if (Array.isArray(payload.parts)) {
+    for (const p of payload.parts) {
+      const found = findPart(p, mimeType)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// Cuerpo legible del correo: se prefiere text/plain y, si no existe, se limpia
+// el text/html. Nunca se devuelve markup crudo.
 export function extractBody(payload: any): string {
   if (!payload) return ''
-  if (payload.body?.data) return decodeB64Url(payload.body.data)
-  if (Array.isArray(payload.parts)) {
-    return payload.parts.map(extractBody).join('\n')
-  }
-  return ''
+  const plain = findPart(payload, 'text/plain')
+  if (plain) return plain
+  const html = findPart(payload, 'text/html')
+  return html ? stripHtml(html) : ''
 }
 
 export function collectXmlAttachments(payload: any, out: string[] = []): string[] {
@@ -87,6 +129,27 @@ export function parseCfdiString(xml: string): {
     currency: moneda && /^[A-Z]{3}$/.test(moneda) ? moneda : null,
     isIncome: (tipo ?? '').toUpperCase() === 'N',
   }
+}
+
+// Monto pegado a un símbolo o código de moneda, antes o después de la cifra.
+const CURRENCY_AMOUNT =
+  /(?:\$|\bMXN\b|\bUSD\b|\bEUR\b)\s*([\d,]+(?:\.\d{2})?)|([\d,]+(?:\.\d{2})?)\s*(?:\bMXN\b|\bUSD\b|\bEUR\b)/i
+// Respaldo para bancos que omiten la moneda: cualquier cifra con dos decimales.
+const LOOSE_AMOUNT = /([\d,]+\.\d{2})/
+
+// Primer monto válido del texto. Se prefiere el que va junto a una moneda para
+// no quedarse con un folio o un número de versión que aparezca antes.
+function matchAmount(text: string, cfg: EmailRuleConfig): number | null {
+  const patterns = cfg.amountRegex
+    ? [new RegExp(cfg.amountRegex, 'i')]
+    : [CURRENCY_AMOUNT, LOOSE_AMOUNT]
+  for (const re of patterns) {
+    const raw = text.match(re)?.slice(1).find((g) => g != null)
+    if (!raw) continue
+    const n = parseFloat(raw.replace(/,/g, ''))
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return null
 }
 
 export function resolveCard(cards: CardRow[], last4: string | null): CardRow | null {
@@ -140,17 +203,17 @@ export async function stageFromGmailMessage(
     }
   }
 
-  // 2) Regla por remitente + regex.
+  // 2) Regla por remitente + regex. El remitente es OBLIGATORIO: si el correo
+  //    no viene de uno configurado no se registra nada. Sin este corte, cualquier
+  //    correo del buzón con un número de dos decimales acababa como egreso.
   const rule = rules.find((r) =>
     (r.config.senders ?? []).some((s) => from.includes(s.toLowerCase())),
   )
-  const cfg: EmailRuleConfig = rule?.config ?? {}
+  if (!rule) return null
+  const cfg: EmailRuleConfig = rule.config
 
-  const amountRe = cfg.amountRegex ? new RegExp(cfg.amountRegex, 'i') : /\$?\s?([\d,]+\.\d{2})/
-  const amountMatch = text.match(amountRe)
-  if (!amountMatch) return null
-  const amount = parseFloat(amountMatch[1].replace(/,/g, ''))
-  if (!Number.isFinite(amount) || amount <= 0) return null
+  const amount = matchAmount(text, cfg)
+  if (amount == null) return null
 
   const concept = cfg.conceptRegex
     ? text.match(new RegExp(cfg.conceptRegex, 'i'))?.[1] ?? subject
