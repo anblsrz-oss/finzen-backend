@@ -44,6 +44,7 @@ El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separaci
 - `0037_budgets.sql` — Presupuestos: tabla, periodos y `budget_status_at()`
 - `0038_budget_alerts.sql` — Avisos de presupuesto (dedupe) y `record_budget_alerts()`
 - `0039_budget_alerts_cron.sql` — Aviso por correo: opt-in y `record_budget_alerts_all()`
+- `0040_push_tokens.sql` — Aviso por push: tabla `push_tokens` y `pending_budget_push_alerts()`
 
 ### Edge Functions (`supabase/functions/`)
 
@@ -63,6 +64,7 @@ El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separaci
 - `gmail-watch-renew/` — Renueva el watch antes de que expire. Lo llama un cron. `--no-verify-jwt`
 - `ingest-sms/` — Ingesta de SMS bancarios desde el receptor nativo Android. `--no-verify-jwt`
 - `budget-alerts-email/` — Aviso diario de presupuestos por correo. Lo llama un cron. `--no-verify-jwt`
+- `budget-alerts-push/` — Aviso diario de presupuestos por push (FCM HTTP v1, cuenta de servicio). Lo llama un cron. `--no-verify-jwt`
 
 ### Crons (`pg_cron`, se agendan a mano en el SQL Editor)
 
@@ -70,9 +72,11 @@ El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separaci
 |---|---|---|
 | `gmail-watch-renew-daily` | `0 6 * * *` | `gmail-watch-renew` |
 | `budget-alerts-daily` | `0 14 * * *` (08:00 CST) | `budget-alerts-email` |
+| `budget-alerts-push-daily` | `0 14 * * *` (08:00 CST) | `budget-alerts-push` |
 
-Ambos se autorizan con el header `x-cron-secret` (secret `CRON_SECRET`).
-Ver el bloque comentado al final de `0039_budget_alerts_cron.sql`.
+Los tres se autorizan con el header `x-cron-secret` (secret `CRON_SECRET`).
+Ver el bloque comentado al final de `0039_budget_alerts_cron.sql` y
+`0040_push_tokens.sql`.
 
 ## Deployment
 
