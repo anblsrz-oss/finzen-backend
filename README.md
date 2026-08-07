@@ -30,6 +30,21 @@ El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separaci
 - `0022_account_yields.sql` — Rendimientos anuales de cuentas
 - `0023_credit_usage_net.sql` — Uso neto de crédito
 - `0024_transaction_filter_indexes.sql` — Índices para filtros de transacciones
+- `0025_tx_kind_card_payment.sql` — Tipo de movimiento "pago de tarjeta"
+- `0026_card_payments.sql` — Pagos de tarjeta y vistas de saldo/uso recalculadas
+- `0027_installment_tracking.sql` / `0028_backfill_installment_ledger.sql` — Ledger de MSI mes a mes
+- `0029_voucher_card_and_account_type.sql` — Tarjetas y cuentas de vales
+- `0030_card_bank_name.sql` — Banco de la tarjeta
+- `0031_profiles_first_last_name.sql` — Nombre y apellido en el perfil
+- `0032_sms_device_tokens.sql` — Tokens de dispositivo para la captura de SMS
+- `0033_gmail_connections.sql` — Conexiones de Gmail (push en tiempo real)
+- `0034_cleanup_email_false_positives.sql` — Limpieza de falsos positivos del correo
+- `0035_fix_transfer_shape_external.sql` — Forma de las transferencias externas
+- `0036_app_config_period_filters.sql` — Flags premium del selector de periodo
+- `0037_budgets.sql` — Presupuestos: tabla, periodos y `budget_status_at()`
+- `0038_budget_alerts.sql` — Avisos de presupuesto (dedupe) y `record_budget_alerts()`
+- `0039_budget_alerts_cron.sql` — Aviso por correo: opt-in y `record_budget_alerts_all()`
+- `0040_push_tokens.sql` — Aviso por push: tabla `push_tokens` y `pending_budget_push_alerts()`
 
 ### Edge Functions (`supabase/functions/`)
 
@@ -43,7 +58,25 @@ El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separaci
 - `invite-family-email/` — Invitación de familia por correo
 - `send-feedback/` — Envío de feedback
 - `sync-aggregator/` — Sincronización con agregador
-- `sync-email/` — Sincronización por correo
+- `sync-email/` — Sincronización por correo (pull manual)
+- `gmail-push/` — Webhook de Gmail Pub/Sub (captura en tiempo real). `--no-verify-jwt`
+- `gmail-watch/` — Activa el `users.watch` de Gmail
+- `gmail-watch-renew/` — Renueva el watch antes de que expire. Lo llama un cron. `--no-verify-jwt`
+- `ingest-sms/` — Ingesta de SMS bancarios desde el receptor nativo Android. `--no-verify-jwt`
+- `budget-alerts-email/` — Aviso diario de presupuestos por correo. Lo llama un cron. `--no-verify-jwt`
+- `budget-alerts-push/` — Aviso diario de presupuestos por push (FCM HTTP v1, cuenta de servicio). Lo llama un cron. `--no-verify-jwt`
+
+### Crons (`pg_cron`, se agendan a mano en el SQL Editor)
+
+| Job | Horario (UTC) | Qué llama |
+|---|---|---|
+| `gmail-watch-renew-daily` | `0 6 * * *` | `gmail-watch-renew` |
+| `budget-alerts-daily` | `0 14 * * *` (08:00 CST) | `budget-alerts-email` |
+| `budget-alerts-push-daily` | `0 14 * * *` (08:00 CST) | `budget-alerts-push` |
+
+Los tres se autorizan con el header `x-cron-secret` (secret `CRON_SECRET`).
+Ver el bloque comentado al final de `0039_budget_alerts_cron.sql` y
+`0040_push_tokens.sql`.
 
 ## Deployment
 

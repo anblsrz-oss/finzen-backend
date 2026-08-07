@@ -9,6 +9,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // ingreso/gasto según el texto, se deduplica y se insertan transacciones
 // PENDIENTES (source='sms', pending=true) para que el usuario confirme.
 //
+// Además, cuando el gasto capturado acerca al usuario al tope de algún
+// presupuesto, la respuesta trae `budgetNotice` para que el receptor nativo lo
+// muestre como notificación. Es el único aviso de presupuesto que hoy funciona
+// con la app CERRADA sin Firebase.
+//
 // Desplegar SIN verificación de JWT (la auth es por token de dispositivo):
 //   supabase functions deploy ingest-sms --no-verify-jwt
 
@@ -192,16 +197,97 @@ serve(async (req) => {
     }
     await touchDevice(supabase, device.id)
 
+    // 5) ¿Este gasto acerca al usuario al tope de algún presupuesto?
+    const insertedExpense = fresh.some((f) => f.kind === 'expense')
+    const budgetNotice = insertedExpense
+      ? await budgetNoticeFor(supabase, userId, fresh[0].tx_date as string)
+      : null
+
     return json({
       found: messages.length,
       inserted: fresh.length,
       duplicates: staged.length - fresh.length,
+      budgetNotice,
     })
   } catch (error) {
     console.error('ingest-sms error:', error)
     return json({ error: (error as Error).message }, 500)
   }
 })
+
+interface BudgetStatus {
+  budget_id: string
+  category_name: string | null
+  amount: number
+  currency: string
+  spent: number
+  spent_pending: number
+  alert_threshold: number
+}
+
+function money(value: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(value)
+  } catch {
+    return `${value.toFixed(2)} ${currency}`
+  }
+}
+
+/**
+ * Texto para la notificación nativa, o null si no hay nada que avisar.
+ *
+ * Habla en PROYECTADO (confirmado + por revisar), no en confirmado, porque el
+ * movimiento que acaba de entrar está pendiente: budget_status_at lo deja fuera
+ * de `spent` a propósito (un SMS puede ser el duplicado del correo). Avisar solo
+ * con lo confirmado haría que esta notificación no saltara nunca en el momento
+ * de la compra, que es justo cuando sirve.
+ *
+ * Por eso el texto dice "llegarías" y no "llevas": el número es una proyección
+ * hasta que el usuario confirme el movimiento. Los avisos formales
+ * (budget_alerts, correo) siguen contando solo lo confirmado.
+ *
+ * No se registra nada en budget_alerts: esto es un aviso efímero, y su
+ * frecuencia ya está acotada por la de los SMS reales.
+ */
+async function budgetNoticeFor(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  today: string,
+): Promise<{ title: string; body: string } | null> {
+  try {
+    // service_role no pasa por RLS, así que hay que acotar por user_id a mano.
+    const { data, error } = await supabase
+      .rpc('budget_status_at', { p_today: today })
+      .eq('user_id', userId)
+    if (error) throw error
+
+    const rows = (data ?? []) as BudgetStatus[]
+    let worst: { row: BudgetStatus; percent: number } | null = null
+    for (const row of rows) {
+      if (!row.amount) continue
+      const projected = Number(row.spent) + Number(row.spent_pending)
+      const percent = (projected / Number(row.amount)) * 100
+      if (percent < row.alert_threshold) continue
+      if (!worst || percent > worst.percent) worst = { row, percent }
+    }
+    if (!worst) return null
+
+    const { row, percent } = worst
+    const name = row.category_name ?? 'tu presupuesto general'
+    const projected = Number(row.spent) + Number(row.spent_pending)
+    return {
+      title:
+        percent >= 100
+          ? `🚨 Te pasarías del presupuesto de ${name}`
+          : `🎯 Llegarías al ${Math.round(percent)}% de ${name}`,
+      body: `${money(projected, row.currency)} de ${money(Number(row.amount), row.currency)} · confirma el movimiento para que cuente`,
+    }
+  } catch (e) {
+    // Un fallo aquí no puede tumbar la ingesta: la transacción ya se guardó.
+    console.error('budgetNoticeFor falló:', (e as Error).message)
+    return null
+  }
+}
 
 async function touchDevice(supabase: ReturnType<typeof createClient>, id: string) {
   await supabase
