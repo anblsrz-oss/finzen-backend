@@ -15,7 +15,7 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 )
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Ahorbit <onboarding@resend.dev>'
+const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Mi Control de Finanzas Personales <onboarding@resend.dev>'
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://finze.xyz'
 
 const CORS = {
@@ -74,12 +74,12 @@ serve(async (req) => {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: [email],
-        subject: `${ownerName} te invitó a su plan familiar en Ahorbit`,
+        subject: `${ownerName} te invitó a su plan familiar en Mi Control de Finanzas Personales`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2>💰 Ahorbit</h2>
+            <h2>💰 Mi Control de Finanzas Personales</h2>
             <p><strong>${ownerName}</strong> te invitó a unirte al plan familiar
-               "<strong>${family.name}</strong>" en Ahorbit.</p>
+               "<strong>${family.name}</strong>" en Mi Control de Finanzas Personales.</p>
             <p>Podrás ver y registrar gastos en las tarjetas que comparta contigo,
                sin acceso a su límite de crédito.</p>
             <p>

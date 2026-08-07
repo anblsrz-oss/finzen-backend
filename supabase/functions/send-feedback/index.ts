@@ -8,7 +8,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Ahorbit <onboarding@resend.dev>'
+const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Mi Control de Finanzas Personales <onboarding@resend.dev>'
 const TO_EMAIL = Deno.env.get('FEEDBACK_TO_EMAIL') ?? 'anbl.srz@gmail.com'
 
 const CORS = {
@@ -57,10 +57,10 @@ serve(async (req) => {
         from: FROM_EMAIL,
         to: [TO_EMAIL],
         reply_to: typeof email === 'string' && email.includes('@') ? email : undefined,
-        subject: `💬 Comentario en Ahorbit — ${escapeHtml(fromName)}`,
+        subject: `💬 Comentario en Mi Control de Finanzas Personales — ${escapeHtml(fromName)}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2>💬 Nuevo comentario en Ahorbit</h2>
+            <h2>💬 Nuevo comentario en Mi Control de Finanzas Personales</h2>
             <p><strong>De:</strong> ${escapeHtml(fromName)} (${escapeHtml(fromEmail)})</p>
             <p style="white-space: pre-wrap; background:#f8fafc; padding:12px;
                       border-radius:8px; color:#0f172a;">${escapeHtml(text)}</p>

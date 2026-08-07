@@ -1,4 +1,4 @@
-﻿// Crea una sesión de Stripe Checkout para la suscripción Premium de Ahorbit.
+﻿// Crea una sesión de Stripe Checkout para la suscripción Premium de Mi Control de Finanzas Personales.
 // El usuario autenticado (JWT) inicia el pago; al completarse, el webhook
 // stripe-webhook marca is_premium = true.
 //

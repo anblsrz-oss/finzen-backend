@@ -19,7 +19,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
-const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Ahorbit <onboarding@resend.dev>'
+const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Mi Control de Finanzas Personales <onboarding@resend.dev>'
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://finze.xyz'
 
 interface PendingAlert {

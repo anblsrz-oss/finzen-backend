@@ -1,6 +1,6 @@
-# Ahorbit Backend
+# Mi Control de Finanzas Personales — Backend
 
-Supabase backend para Ahorbit (antes FinZen) — Control de finanzas personales.
+Supabase backend para Mi Control de Finanzas Personales (antes Ahorbit, antes FinZen) — Control de finanzas personales.
 
 Este repositorio es la **fuente de verdad del backend**: migraciones SQL y Edge Functions.
 El frontend vive en un repo aparte (`finzen-frontend`) para mantener la separación de responsabilidades.
